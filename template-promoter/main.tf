@@ -69,7 +69,7 @@ resource "coderd_template" "templates" {
 
   versions = [
     {
-      name        = "active-template-${var.commit_sha}"
+      name        = "${each.key}-${var.commit_sha}"
       description = var.commit_sha != "" ? "Deployed from commit: ${var.commit_sha}" : "Active version"
       directory   = "../templates/${each.key}"
       active      = true
