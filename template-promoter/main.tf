@@ -12,7 +12,7 @@ provider "coderd" {
   token = "065v9lo3Sc-ctxoYK6poH7cAA2tShxwmz"
 }
 
-variable "COMMIT_SHA" {
+variable "commit_sha" {
   type        = string
   default     = ""
   description = "Optional commit SHA to mention in the template version."
@@ -69,8 +69,8 @@ resource "coderd_template" "templates" {
 
   versions = [
     {
-      name        = "active"
-      description = var.COMMIT_SHA != "" ? "Deployed from commit: ${var.COMMIT_SHA}" : "Active version"
+      name        = "active-template-${var.commit_sha}"
+      description = var.commit_sha != "" ? "Deployed from commit: ${var.commit_sha}" : "Active version"
       directory   = "../templates/${each.key}"
       active      = true
       tf_vars     = local.all_tf_vars
