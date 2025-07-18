@@ -1,0 +1,7 @@
+{
+  "display_name": "Go Web Development",
+  "description": "Go development with hot-reload, debugging tools, PostgreSQL and Redis for full-stack apps.",
+  "icon": "🚀",
+  "tags": ["golang", "web", "api", "backend"],
+  "category": "backend"
+} 

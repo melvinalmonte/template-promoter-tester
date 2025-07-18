@@ -1,0 +1,7 @@
+{
+  "display_name": "Ubuntu Development (with Docker)",
+  "description": "Full Ubuntu workspace with Docker, VS Code, and persistent storage for containerized development.",
+  "icon": "🐳",
+  "tags": ["ubuntu", "docker", "vscode", "kubernetes"],
+  "category": "development"
+} 
