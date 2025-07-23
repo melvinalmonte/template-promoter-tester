@@ -1,217 +1,200 @@
 # Local values for convenience
 locals {
-  namespace = "coder"  # Using the coder namespace we created
-  
-  # Create a safe name for Kubernetes resources
   workspace_name = lower("${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}")
   
-  # Common labels for all resources
-  common_labels = {
-    "coder.owner"          = data.coder_workspace.me.owner
-    "coder.owner_id"       = data.coder_workspace.me.owner_id
-    "coder.workspace_id"   = data.coder_workspace.me.id
-    "coder.workspace_name" = data.coder_workspace.me.name
+  # Simulated resource status
+  fake_resource_status = {
+    container_id = "dummy-${substr(md5(local.workspace_name), 0, 12)}"
+    ip_address   = "10.0.0.${(data.coder_workspace.me.transition == "start" ? "100" : "0")}"
+    status       = data.coder_workspace.me.transition == "start" ? "running" : "stopped"
   }
 }
 
-# Persistent Volume Claim for home directory
-resource "kubernetes_persistent_volume_claim" "home" {
-  metadata {
-    name      = "coder-${local.workspace_name}-home"
-    namespace = local.namespace
-    labels    = local.common_labels
+# Dummy resource that represents our "infrastructure"
+resource "null_resource" "workspace" {
+  count = data.coder_workspace.me.start_count
+  
+  triggers = {
+    workspace_id   = data.coder_workspace.me.id
+    workspace_name = local.workspace_name
+    cpu            = data.coder_parameter.cpu.value
+    memory         = data.coder_parameter.memory.value
+    always_run     = timestamp()
   }
   
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        storage = "${data.coder_parameter.disk_size.value}Gi"
-      }
-    }
+  # Simulate provisioning
+  provisioner "local-exec" {
+    command = "echo 'Starting dummy workspace ${local.workspace_name} with ${data.coder_parameter.cpu.value} CPUs and ${data.coder_parameter.memory.value}GB RAM'"
   }
   
-  # This ensures the PVC is deleted when the workspace is deleted
-  lifecycle {
-    ignore_changes = [metadata[0].labels]
+  # Simulate cleanup
+  provisioner "local-exec" {
+    when    = destroy
+    command = "echo 'Stopping dummy workspace ${self.triggers.workspace_name}'"
   }
 }
 
-# The main workspace pod
-resource "kubernetes_pod" "workspace" {
-  count = data.coder_workspace.me.start_count  # 0 when stopped, 1 when started
-  
-  metadata {
-    name      = "coder-${local.workspace_name}"
-    namespace = local.namespace
-    labels    = local.common_labels
-  }
-  
-  spec {
-    # Security context for the pod
-    security_context {
-      run_as_user  = 1000
-      fs_group     = 1000
-      run_as_non_root = true
+# Create a dummy state file to simulate persistence
+resource "local_file" "workspace_state" {
+  count    = data.coder_workspace.me.start_count
+  filename = "/tmp/coder-dummy-${local.workspace_name}.state"
+  content  = jsonencode({
+    workspace_id = data.coder_workspace.me.id
+    owner        = data.coder_workspace.me.owner
+    name         = data.coder_workspace.me.name
+    created_at   = timestamp()
+    resources    = {
+      cpu    = data.coder_parameter.cpu.value
+      memory = data.coder_parameter.memory.value
+      disk   = data.coder_parameter.disk_size.value
     }
-    
-    # Main development container
-    container {
-      name  = "dev"
-      image = "codercom/enterprise-base:ubuntu"  # Coder's base image with common tools
-      
-      # Keep the container running
-      command = ["sh", "-c"]
-      args = ["coder agent"]
-      
-      # Security context for the container
-      security_context {
-        run_as_user                = 1000
-        allow_privilege_escalation = false
-        run_as_non_root           = true
-      }
-      
-      # Environment variables
-      env {
-        name  = "CODER_AGENT_TOKEN"
-        value = coder_agent.main.token
-      }
-      
-      env {
-        name  = "HOME"
-        value = "/home/coder"
-      }
-      
-      # Resource limits
-      resources {
-        requests = {
-          cpu    = "${data.coder_parameter.cpu.value}"
-          memory = "${data.coder_parameter.memory.value}Gi"
-        }
-        limits = {
-          cpu    = "${data.coder_parameter.cpu.value}"
-          memory = "${data.coder_parameter.memory.value}Gi"
-        }
-      }
-      
-      # Mount the home directory
-      volume_mount {
-        name       = "home"
-        mount_path = "/home/coder"
-      }
-    }
-    
-    # Define the volume
-    volume {
-      name = "home"
-      persistent_volume_claim {
-        claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
-      }
-    }
-  }
+    dotfiles_repo = data.coder_parameter.dotfiles_repo.value
+    status        = local.fake_resource_status
+  })
 }
 
-# Coder agent handles the connection between Coder and the workspace
+# Coder agent - this is required for Coder to manage the workspace
 resource "coder_agent" "main" {
   arch = "amd64"
   os   = "linux"
   
-  # Startup script runs when the workspace starts
+  # Startup script that simulates workspace initialization
   startup_script = <<-EOT
     #!/bin/bash
     set -e
     
-    # Set up home directory if it's new
-    if [ ! -f ~/.bashrc ]; then
-      cp /etc/skel/.bashrc ~/
-      cp /etc/skel/.profile ~/
-    fi
+    echo "🚀 Starting dummy workspace..."
+    echo "📊 Resources allocated:"
+    echo "   - CPU: ${data.coder_parameter.cpu.value} cores"
+    echo "   - Memory: ${data.coder_parameter.memory.value} GB"
+    echo "   - Disk: ${data.coder_parameter.disk_size.value} GB"
     
-    # Clone dotfiles if specified
+    # Simulate dotfiles setup
     if [ -n "${data.coder_parameter.dotfiles_repo.value}" ]; then
-      echo "Setting up dotfiles from ${data.coder_parameter.dotfiles_repo.value}..."
-      
-      # Clone to a temporary directory
-      temp_dir=$(mktemp -d)
-      git clone "${data.coder_parameter.dotfiles_repo.value}" "$temp_dir/dotfiles"
-      
-      # Copy dotfiles to home (customize this based on your dotfiles structure)
-      if [ -f "$temp_dir/dotfiles/install.sh" ]; then
-        cd "$temp_dir/dotfiles" && ./install.sh
-      else
-        # Simple copy for common dotfiles
-        for file in .bashrc .vimrc .gitconfig .tmux.conf; do
-          [ -f "$temp_dir/dotfiles/$file" ] && cp "$temp_dir/dotfiles/$file" ~/
-        done
-      fi
-      
-      rm -rf "$temp_dir"
+      echo "📁 Would clone dotfiles from: ${data.coder_parameter.dotfiles_repo.value}"
+      echo "   (This is a dummy workspace - no actual cloning performed)"
     fi
     
-    # Install any additional tools you want here
-    # For example:
-    # sudo apt-get update && sudo apt-get install -y htop tree
+    # Create a dummy process to keep the agent alive
+    echo "✅ Dummy workspace ready!"
+    echo "ℹ️  This is a simulated environment for testing purposes"
     
-    echo "Workspace setup complete!"
+    # Keep the agent running
+    while true; do
+      sleep 30
+      echo "💓 Dummy workspace heartbeat at $(date)"
+    done &
   EOT
   
-  # Optional: specify connection modes
+  # Connection options
   display_apps {
     vscode          = true
     vscode_insiders = false
     web_terminal    = true
-    ssh_helper      = true
+    ssh_helper      = false  # SSH not available in dummy mode
   }
 }
 
-# VS Code in the browser
+# Dummy VS Code app (simulated)
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "vscode"
-  display_name = "VS Code"
-  url          = "http://localhost:13337?folder=/home/coder"
+  display_name = "VS Code (Dummy)"
+  url          = "http://localhost:13337?folder=/tmp/dummy-workspace"
   icon         = "/icon/code.svg"
   subdomain    = false
   share        = "owner"
   
   healthcheck {
     url       = "http://localhost:13337/healthz"
-    interval  = 5
-    threshold = 6
+    interval  = 30
+    threshold = 3
   }
 }
 
-# Web terminal
+# Web terminal (simulated)
 resource "coder_app" "terminal" {
   agent_id     = coder_agent.main.id
   slug         = "terminal"
-  display_name = "Terminal"
+  display_name = "Terminal (Dummy)"
   icon         = "/icon/terminal.svg"
-  command      = "bash"
+  command      = "echo 'This is a dummy terminal - no real shell available' && cat"
 }
 
-# Resource metadata - shows in the Coder UI
+# Status page showing dummy info
+resource "coder_app" "status" {
+  agent_id     = coder_agent.main.id
+  slug         = "status"
+  display_name = "Workspace Status"
+  icon         = "/icon/info.svg"
+  url          = "http://localhost:8080"
+  subdomain    = false
+  share        = "owner"
+}
+
+# Metadata for the Coder UI
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = kubernetes_pod.workspace[0].id
+  resource_id = null_resource.workspace[0].id
+  
+  item {
+    key   = "Type"
+    value = "Dummy Workspace"
+  }
   
   item {
     key   = "CPU"
-    value = "${data.coder_parameter.cpu.value} cores"
+    value = "${data.coder_parameter.cpu.value} cores (simulated)"
   }
   
   item {
     key   = "Memory"
-    value = "${data.coder_parameter.memory.value} GB"
+    value = "${data.coder_parameter.memory.value} GB (simulated)"
   }
   
   item {
     key   = "Disk"
-    value = "${data.coder_parameter.disk_size.value} GB"
+    value = "${data.coder_parameter.disk_size.value} GB (simulated)"
   }
   
   item {
-    key   = "Image"
-    value = "codercom/enterprise-base:ubuntu"
+    key   = "Container ID"
+    value = local.fake_resource_status.container_id
+  }
+  
+  item {
+    key   = "IP Address"
+    value = local.fake_resource_status.ip_address
+  }
+  
+  item {
+    key   = "Status"
+    value = local.fake_resource_status.status
   }
 }
+
+# Show some helpful info in the logs
+resource "null_resource" "startup_message" {
+  count = data.coder_workspace.me.start_count
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "=========================================="
+      echo "🎭 DUMMY WORKSPACE CREATED"
+      echo "=========================================="
+      echo "This is a simulated workspace for testing."
+      echo "No real resources have been provisioned."
+      echo ""
+      echo "Workspace Details:"
+      echo "- Name: ${local.workspace_name}"
+      echo "- Owner: ${data.coder_workspace.me.owner}"
+      echo "- ID: ${data.coder_workspace.me.id}"
+      echo ""
+      echo "Simulated Resources:"
+      echo "- CPU: ${data.coder_parameter.cpu.value} cores"
+      echo "- Memory: ${data.coder_parameter.memory.value} GB"
+      echo "- Disk: ${data.coder_parameter.disk_size.value} GB"
+      echo "=========================================="
+    EOT
+  }
+} 

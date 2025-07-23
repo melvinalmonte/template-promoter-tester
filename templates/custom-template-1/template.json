@@ -1,7 +1,7 @@
 {
-  "display_name": "Ubuntu Development (with Docker)",
-  "description": "Full Ubuntu workspace with Docker, VS Code, and persistent storage for containerized development.",
-  "icon": "/icon/docker.png",
-  "tags": ["ubuntu", "docker", "vscode", "kubernetes"],
-  "category": "development"
+  "display_name": "Dummy Testing Template",
+  "description": "A lightweight dummy template for testing Coder deployments. No real infrastructure required.",
+  "icon": "/icon/code.svg",
+  "tags": ["testing", "dummy", "development", "lightweight"],
+  "category": "testing"
 } 

@@ -1,7 +1,0 @@
-{
-  "display_name": "Python Data Science",
-  "description": "Python environment with Jupyter Lab, pandas, numpy, and ML libraries. GPU support available.",
-  "icon": "/icon/python.svg",
-  "tags": ["python", "jupyter", "data-science", "machine-learning"],
-  "category": "data-science"
-} 
