@@ -1,4 +1,4 @@
-# Dummy Testing Template 1
+# Dummy Testing Template 2
 
 A lightweight template for testing Coder deployments without requiring real infrastructure.
 

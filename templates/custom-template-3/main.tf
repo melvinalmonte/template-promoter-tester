@@ -182,7 +182,7 @@ resource "null_resource" "startup_message" {
       echo "=========================================="
       echo "🎭 DUMMY WORKSPACE CREATED"
       echo "=========================================="
-      echo "This is a simulated workspace for testing this wont do anything."
+      echo "This is a simulated workspace for testing."
       echo "No real resources have been provisioned."
       echo ""
       echo "Workspace Details:"

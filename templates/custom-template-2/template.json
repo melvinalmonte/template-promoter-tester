@@ -1,7 +1,7 @@
 {
-  "display_name": "Dummy Testing Template",
+  "display_name": "Dummy Testing Template 2",
   "description": "A lightweight dummy template for testing Coder deployments. No real infrastructure required.",
-  "icon": "/icon/okta.svg",
+  "icon": "/icon/code.svg",
   "tags": ["testing", "dummy", "development", "lightweight"],
   "category": "testing"
 } 

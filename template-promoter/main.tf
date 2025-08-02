@@ -1,17 +1,3 @@
-terraform {
-  required_providers {
-    coderd = {
-      source  = "coder/coderd"
-      version = ">= 0.0.11"
-    }
-  }
-}
-
-provider "coderd" {
-  url   = "http://localhost:3000"
-  token = "065v9lo3Sc-ctxoYK6poH7cAA2tShxwmz"
-}
-
 variable "commit_sha" {
   type        = string
   default     = ""
