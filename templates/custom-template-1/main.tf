@@ -186,27 +186,62 @@ resource "null_resource" "workspace" {
     always_run     = timestamp()
   }
   
-  # Simulate provisioning - but actually run the agent init script
+  # Download and run the Coder agent binary
   provisioner "local-exec" {
     command = <<-EOT
-      echo 'Starting dummy workspace ${local.workspace_name} with ${data.coder_parameter.cpu.value} CPUs and ${data.coder_parameter.memory.value}GB RAM'
-      # Start a background process that runs the agent init script
-      nohup bash -c '${replace(coder_agent.main.init_script, "'", "'\\''")}' > /tmp/coder-agent-${local.workspace_name}.log 2>&1 &
+      echo 'Setting up devcontainer workspace ${local.workspace_name}'
+      
+      # Create the workspace directory first
+      mkdir -p ${local.workspace_dir}
+      cd ${local.workspace_dir}
+      
+      # Run the startup script to set up file server and devcontainer
+      bash -c '${replace(coder_agent.main.init_script, "'", "'\\''")}' > /tmp/coder-agent-${local.workspace_name}-setup.log 2>&1
+      
+      # Download the Coder agent binary
+      echo 'Downloading Coder agent...'
+      curl -fsSL "${data.coder_workspace.me.access_url}/bin/coder-darwin-amd64" -o /tmp/coder-agent-${local.workspace_name} || {
+        echo 'Failed to download agent, using curl fallback'
+        curl -fsSL "${data.coder_workspace.me.access_url}/api/v2/users/me/workspace/agent" -H "Coder-Session-Token: ${coder_agent.main.token}" -o /tmp/coder-agent-${local.workspace_name}
+      }
+      chmod +x /tmp/coder-agent-${local.workspace_name}
+      
+      # Start the Coder agent with proper environment
+      echo 'Starting Coder agent...'
+      cd ${local.workspace_dir}
+      CODER_AGENT_TOKEN="${coder_agent.main.token}" \
+      CODER_AGENT_URL="${data.coder_workspace.me.access_url}" \
+      nohup /tmp/coder-agent-${local.workspace_name} > /tmp/coder-agent-${local.workspace_name}.log 2>&1 &
       echo $! > /tmp/coder-agent-${local.workspace_name}.pid
+      
+      echo 'Coder agent started successfully'
     EOT
   }
   
-  # Simulate cleanup
+  # Cleanup agent and resources
   provisioner "local-exec" {
     when    = destroy
     command = <<-EOT
-      echo 'Stopping dummy workspace ${self.triggers.workspace_name}'
+      echo 'Stopping devcontainer workspace ${self.triggers.workspace_name}'
+      
+      # Stop the Coder agent
       if [ -f /tmp/coder-agent-${self.triggers.workspace_name}.pid ]; then
         PID=$(cat /tmp/coder-agent-${self.triggers.workspace_name}.pid)
         kill $PID 2>/dev/null || true
         rm -f /tmp/coder-agent-${self.triggers.workspace_name}.pid
         rm -f /tmp/coder-agent-${self.triggers.workspace_name}.log
+        rm -f /tmp/coder-agent-${self.triggers.workspace_name}-setup.log
+        rm -f /tmp/coder-agent-${self.triggers.workspace_name}
       fi
+      
+      # Stop the file server
+      if [ -f /tmp/devcontainer-server.pid ]; then
+        PID=$(cat /tmp/devcontainer-server.pid)
+        kill $PID 2>/dev/null || true
+        rm -f /tmp/devcontainer-server.pid
+      fi
+      
+      echo 'Cleanup completed'
     EOT
   }
   
@@ -254,7 +289,7 @@ resource "coder_agent" "main" {
     GIT_COMMITTER_EMAIL = "${data.coder_workspace.me.owner}@example.com"
   }
   
-  # Simple startup script focused on devcontainer
+  # Startup script that sets up the environment but doesn't block
   startup_script = <<-EOT
     #!/bin/bash
     set -e
@@ -277,12 +312,6 @@ resource "coder_agent" "main" {
     echo "✅ Devcontainer workspace ready!"
     echo "📄 Devcontainer config: ${local.workspace_dir}/.devcontainer/devcontainer.json"
     echo "🌐 File server: http://localhost:8080"
-    
-    # Keep the agent running with minimal overhead
-    while true; do
-      sleep 60
-      echo "💓 Devcontainer workspace heartbeat at $(date)"
-    done
   EOT
   
   # Shutdown script
