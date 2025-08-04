@@ -15,11 +15,6 @@ terraform {
   }
 }
 
-# The Coder provider is automatically configured by Coder
 provider "coder" {}
-
-# Null provider for dummy resources
 provider "null" {}
-
-# Local provider for file operations
 provider "local" {} 

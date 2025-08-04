@@ -1,7 +1,7 @@
 {
-  "display_name": "Devcontainer Template",
-  "description": "Simple workspace with built-in devcontainer configuration and file browser access.",
+  "display_name": "Minimal Devcontainer",
+  "description": "Bare minimum template with devcontainer configuration - just create and use in VS Code.",
   "icon": "/icon/docker.svg",
-  "tags": ["devcontainer", "development", "lightweight"],
+  "tags": ["devcontainer", "minimal", "vscode"],
   "category": "development"
 } 
