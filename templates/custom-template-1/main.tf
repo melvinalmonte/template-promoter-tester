@@ -345,6 +345,48 @@ resource "coder_agent" "main" {
 }
 EOF
     
+    # Create a simple HTML page to display devcontainer info
+    echo "📄 Creating devcontainer info page..."
+    cat > ${local.workspace_dir}/devcontainer-info.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Devcontainer Configuration</title>
+    <style>
+        body { 
+            font-family: 'Monaco', 'Menlo', monospace; 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+            padding: 20px; 
+        }
+        pre { 
+            background: #2d2d30; 
+            padding: 20px; 
+            border-radius: 8px; 
+            overflow-x: auto;
+        }
+        h1 { color: #569cd6; }
+    </style>
+</head>
+<body>
+    <h1>🐳 Devcontainer Configuration</h1>
+    <p>Location: <code>.devcontainer/devcontainer.json</code></p>
+    <pre id="content">Loading...</pre>
+    
+    <script>
+        fetch('.devcontainer/devcontainer.json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('content').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('content').textContent = 'Error loading devcontainer.json: ' + error;
+            });
+    </script>
+</body>
+</html>
+EOF
+    
     # Simulate dotfiles setup
     if [ -n "${data.coder_parameter.dotfiles_repo.value}" ]; then
       echo "📁 Would clone dotfiles from: ${data.coder_parameter.dotfiles_repo.value}"
@@ -494,14 +536,21 @@ resource "coder_app" "status" {
   share        = "owner"
 }
 
-# Devcontainer info app (file-based, no WebSocket needed)
+# Devcontainer info app - displays devcontainer.json in a nice HTML page
 resource "coder_app" "devcontainer_info" {
   agent_id     = coder_agent.main.id
   slug         = "devcontainer"
   display_name = "Devcontainer Info"
   icon         = "/icon/docker.svg"
-  url          = "file://${local.workspace_dir}/.devcontainer/devcontainer.json"
-  external     = true
+  url          = "http://localhost:13337/devcontainer-info.html"
+  subdomain    = false
+  share        = "owner"
+  
+  healthcheck {
+    url       = "http://localhost:13337"
+    interval  = 30
+    threshold = 3
+  }
 }
 
 # VS Code workspace file app
