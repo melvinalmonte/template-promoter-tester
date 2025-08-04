@@ -1,7 +1,7 @@
 {
-  "display_name": "Docker VS Code Template",
-  "description": "Docker-based development workspace with VS Code integration and devcontainer support.",
-  "icon": "/icon/docker.svg",
-  "tags": ["docker", "vscode", "development", "devcontainer"],
+  "display_name": "VS Code Testing Template",
+  "description": "Lightweight workspace with real Coder agent and VS Code integration for testing.",
+  "icon": "/icon/code.svg",
+  "tags": ["testing", "vscode", "development", "lightweight"],
   "category": "development"
 } 
