@@ -409,7 +409,6 @@ resource "coder_app" "devcontainer_info" {
   url          = "http://localhost:8080/devcontainer-info.html"
   subdomain    = false
   share        = "owner"
-  external     = true
 }
 
 # Metadata for the Coder UI
