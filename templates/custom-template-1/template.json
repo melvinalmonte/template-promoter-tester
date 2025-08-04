@@ -1,7 +1,7 @@
 {
-  "display_name": "Dummy Testing Template",
-  "description": "A lightweight dummy template for testing Coder deployments. No real infrastructure required.",
-  "icon": "/icon/okta.svg",
-  "tags": ["testing", "dummy", "development", "lightweight"],
-  "category": "testing"
+  "display_name": "Docker VS Code Template",
+  "description": "Docker-based development workspace with VS Code integration and devcontainer support.",
+  "icon": "/icon/docker.svg",
+  "tags": ["docker", "vscode", "development", "devcontainer"],
+  "category": "development"
 } 

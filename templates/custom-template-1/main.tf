@@ -174,34 +174,35 @@ resource "local_file" "vscode_settings" {
   depends_on = [null_resource.workspace_dirs]
 }
 
-# Dummy resource that represents our "infrastructure"
-resource "null_resource" "workspace" {
+# Docker-based workspace (lightweight but functional)
+resource "docker_container" "workspace" {
   count = data.coder_workspace.me.start_count
+  name  = "coder-${data.coder_workspace.me.owner}-${data.coder_workspace.me.name}"
+  image = "codercom/enterprise-base:ubuntu"
   
-  triggers = {
-    workspace_id   = data.coder_workspace.me.id
-    workspace_name = local.workspace_name
-    cpu            = data.coder_parameter.cpu.value
-    memory         = data.coder_parameter.memory.value
-    always_run     = timestamp()
-  }
-  
-  # Simulate provisioning
-  provisioner "local-exec" {
-    command = "echo 'Starting dummy workspace ${local.workspace_name} with ${data.coder_parameter.cpu.value} CPUs and ${data.coder_parameter.memory.value}GB RAM'"
-  }
-  
-  # Simulate cleanup
-  provisioner "local-exec" {
-    when    = destroy
-    command = "echo 'Stopping dummy workspace ${self.triggers.workspace_name}'"
-  }
-  
-  depends_on = [
-    local_file.devcontainer_json,
-    local_file.readme,
-    local_file.vscode_settings
+  # Agent connection
+  env = [
+    "CODER_AGENT_TOKEN=${coder_agent.main.token}",
+    "CODER_AGENT_URL=${data.coder_workspace.me.access_url}",
   ]
+  
+  # Keep container running
+  command = ["/bin/bash", "-c", coder_agent.main.init_script]
+  
+  # Volume for workspace persistence
+  volumes {
+    host_path      = "${path.cwd}/../workspace-${local.workspace_name}"
+    container_path = local.workspace_dir
+  }
+  
+  # Resource limits
+  memory = data.coder_parameter.memory.value * 1024
+  
+  # Port for code-server
+  ports {
+    internal = 13337
+    external = 13337
+  }
 }
 
 # Create a dummy state file to simulate persistence
@@ -482,41 +483,41 @@ resource "coder_app" "vscode_workspace" {
 # Metadata for the Coder UI
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = null_resource.workspace[0].id
+  resource_id = docker_container.workspace[0].id
   
   item {
     key   = "Type"
-    value = "Dummy Workspace with Devcontainer"
+    value = "Docker Workspace with VS Code"
   }
   
   item {
     key   = "CPU"
-    value = "${data.coder_parameter.cpu.value} cores (simulated)"
+    value = "${data.coder_parameter.cpu.value} cores"
   }
   
   item {
     key   = "Memory"
-    value = "${data.coder_parameter.memory.value} GB (simulated)"
+    value = "${data.coder_parameter.memory.value} GB"
   }
   
   item {
     key   = "Disk"
-    value = "${data.coder_parameter.disk_size.value} GB (simulated)"
+    value = "${data.coder_parameter.disk_size.value} GB"
   }
   
   item {
     key   = "Container ID"
-    value = local.fake_resource_status.container_id
+    value = docker_container.workspace[0].id
   }
   
   item {
-    key   = "IP Address"
-    value = local.fake_resource_status.ip_address
+    key   = "Container Name"
+    value = docker_container.workspace[0].name
   }
   
   item {
-    key   = "Status"
-    value = local.fake_resource_status.status
+    key   = "Image"
+    value = docker_container.workspace[0].image
   }
   
   item {
