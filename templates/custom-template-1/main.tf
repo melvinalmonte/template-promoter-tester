@@ -243,7 +243,7 @@ resource "local_file" "workspace_state" {
 # Coder agent - this is required for Coder to manage the workspace
 resource "coder_agent" "main" {
   arch = "amd64"
-  os   = "linux"
+  os   = "darwin"  # macOS
   dir  = local.workspace_dir
   
   # Environment variables for VS Code integration
@@ -268,9 +268,19 @@ resource "coder_agent" "main" {
     echo "📁 Workspace directory: ${local.workspace_dir}"
     echo "🐳 Devcontainer configuration ready at: ${local.workspace_dir}/.devcontainer/devcontainer.json"
     
-    # Install code-server for web-based VS Code
-    echo "🔧 Installing code-server..."
-    curl -fsSL https://code-server.dev/install.sh | sh > /dev/null 2>&1 || {
+    # Install code-server for web-based VS Code (macOS compatible)
+    echo "🔧 Installing code-server for macOS..."
+    if command -v brew >/dev/null 2>&1; then
+      brew install code-server > /dev/null 2>&1 || {
+        echo "⚠️  Homebrew install failed, trying curl method..."
+        curl -fsSL https://code-server.dev/install.sh | sh > /dev/null 2>&1
+      }
+    else
+      curl -fsSL https://code-server.dev/install.sh | sh > /dev/null 2>&1
+    fi
+    
+    # Check if installation succeeded
+    if ! command -v code-server >/dev/null 2>&1; then
       echo "⚠️  Failed to install code-server, using simulated version"
       # Create a simple HTTP server as fallback
       mkdir -p ~/.local/share/code-server
@@ -278,7 +288,7 @@ resource "coder_agent" "main" {
       python3 -m http.server 13337 > /dev/null 2>&1 &
       echo $! > ~/.local/share/code-server/pid
       CODE_SERVER_STARTED="simulated"
-    }
+    fi
     
     # Start code-server if installation succeeded
     if [ "$CODE_SERVER_STARTED" != "simulated" ]; then
@@ -445,22 +455,32 @@ resource "coder_app" "vscode_insiders" {
   command      = "code-insiders --folder-uri vscode-remote://coder+${data.coder_workspace.me.name}${local.workspace_dir}"
 }
 
-# Web terminal
+# Web terminal (simplified for macOS)
 resource "coder_app" "terminal" {
   agent_id     = coder_agent.main.id
   slug         = "terminal"
   display_name = "Terminal"
   icon         = "/icon/terminal.svg"
-  command      = "cd ${local.workspace_dir} && bash"
+  url          = "http://localhost:7681"  # ttyd web terminal
+  subdomain    = false
+  share        = "owner"
+  
+  healthcheck {
+    url       = "http://localhost:7681"
+    interval  = 30
+    threshold = 3
+  }
 }
 
-# SSH connection info
+# SSH connection info (display-only for macOS)
 resource "coder_app" "ssh" {
   agent_id     = coder_agent.main.id
   slug         = "ssh"
-  display_name = "SSH"
+  display_name = "SSH Info"
   icon         = "/icon/terminal.svg"
-  command      = "ssh coder.${data.coder_workspace.me.name}"
+  url          = "http://localhost:13337/ssh-info"  # Custom endpoint showing SSH details
+  subdomain    = false
+  share        = "owner"
 }
 
 # Status page showing dummy info
@@ -474,13 +494,14 @@ resource "coder_app" "status" {
   share        = "owner"
 }
 
-# Devcontainer info app
+# Devcontainer info app (file-based, no WebSocket needed)
 resource "coder_app" "devcontainer_info" {
   agent_id     = coder_agent.main.id
   slug         = "devcontainer"
   display_name = "Devcontainer Info"
   icon         = "/icon/docker.svg"
-  command      = "cat ${local.workspace_dir}/.devcontainer/devcontainer.json"
+  url          = "file://${local.workspace_dir}/.devcontainer/devcontainer.json"
+  external     = true
 }
 
 # VS Code workspace file app
@@ -489,7 +510,8 @@ resource "coder_app" "vscode_workspace" {
   slug         = "workspace-file"
   display_name = "Open VS Code Workspace"
   icon         = "/icon/code.svg"
-  command      = "code ${local.workspace_dir}/workspace.code-workspace"
+  url          = "file://${local.workspace_dir}/workspace.code-workspace"
+  external     = true
 }
 
 # Metadata for the Coder UI
