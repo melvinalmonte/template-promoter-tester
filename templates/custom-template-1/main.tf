@@ -221,11 +221,11 @@ resource "local_file" "workspace_state" {
       disk   = data.coder_parameter.disk_size.value
     }
     dotfiles_repo = data.coder_parameter.dotfiles_repo.value
-    status        = local.fake_resource_status
-    devcontainer  = true
+    container_status = "running"
+    devcontainer     = true
   })
   
-  depends_on = [null_resource.workspace]
+  depends_on = [docker_container.workspace]
 }
 
 # Coder agent - this is required for Coder to manage the workspace
