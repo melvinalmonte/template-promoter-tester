@@ -254,313 +254,81 @@ resource "coder_agent" "main" {
     GIT_COMMITTER_EMAIL = "${data.coder_workspace.me.owner}@example.com"
   }
   
-  # Startup script that simulates workspace initialization
+  # Simple startup script focused on devcontainer
   startup_script = <<-EOT
     #!/bin/bash
     set -e
     
-    echo "🚀 Starting dummy workspace with VS Code support..."
+    echo "🐳 Starting devcontainer workspace..."
     echo "📊 Resources allocated:"
     echo "   - CPU: ${data.coder_parameter.cpu.value} cores"
     echo "   - Memory: ${data.coder_parameter.memory.value} GB"
     echo "   - Disk: ${data.coder_parameter.disk_size.value} GB"
     
     echo "📁 Workspace directory: ${local.workspace_dir}"
-    echo "🐳 Devcontainer configuration ready at: ${local.workspace_dir}/.devcontainer/devcontainer.json"
+    echo "🐳 Devcontainer configuration ready!"
     
-    # Install code-server for web-based VS Code (macOS compatible)
-    echo "🔧 Installing code-server for macOS..."
-    if command -v brew >/dev/null 2>&1; then
-      brew install code-server > /dev/null 2>&1 || {
-        echo "⚠️  Homebrew install failed, trying curl method..."
-        curl -fsSL https://code-server.dev/install.sh | sh > /dev/null 2>&1
-      }
-    else
-      curl -fsSL https://code-server.dev/install.sh | sh > /dev/null 2>&1
-    fi
+    # Simple HTTP server to serve devcontainer files
+    echo "🌐 Starting simple file server..."
+    cd ${local.workspace_dir}
+    python3 -m http.server 8080 > /dev/null 2>&1 &
+    echo $! > /tmp/devcontainer-server.pid
     
-    # Check if installation succeeded
-    if ! command -v code-server >/dev/null 2>&1; then
-      echo "⚠️  Failed to install code-server, using simulated version"
-      # Create a simple HTTP server as fallback
-      mkdir -p ~/.local/share/code-server
-      cd ${local.workspace_dir}
-      python3 -m http.server 13337 > /dev/null 2>&1 &
-      echo $! > ~/.local/share/code-server/pid
-      CODE_SERVER_STARTED="simulated"
-    fi
+    echo "✅ Devcontainer workspace ready!"
+    echo "📄 Devcontainer config: ${local.workspace_dir}/.devcontainer/devcontainer.json"
+    echo "🌐 File server: http://localhost:8080"
     
-    # Start code-server if installation succeeded
-    if [ "$CODE_SERVER_STARTED" != "simulated" ]; then
-      echo "🚀 Starting code-server on port 13337..."
-      mkdir -p ~/.local/share/code-server
-      code-server \
-        --bind-addr 0.0.0.0:13337 \
-        --auth none \
-        --disable-telemetry \
-        --disable-update-check \
-        ${local.workspace_dir} > ~/.local/share/code-server/log 2>&1 &
-      echo $! > ~/.local/share/code-server/pid
-      
-      # Wait for code-server to start
-      for i in {1..30}; do
-        if curl -s http://localhost:13337/healthz > /dev/null 2>&1; then
-          echo "✅ Code-server started successfully"
-          break
-        fi
-        sleep 1
-      done
-    fi
-    
-    # Create VS Code workspace file
-    echo "📝 Creating VS Code workspace configuration..."
-    cat > ${local.workspace_dir}/workspace.code-workspace << 'EOF'
-{
-  "folders": [
-    {
-      "name": "Workspace Root",
-      "path": "."
-    },
-    {
-      "name": "Source Code",
-      "path": "./src"
-    }
-  ],
-  "settings": {
-    "terminal.integrated.defaultProfile.linux": "bash",
-    "editor.formatOnSave": true,
-    "files.autoSave": "afterDelay",
-    "editor.minimap.enabled": false,
-    "workbench.colorTheme": "Default Dark+",
-    "workbench.startupEditor": "readme"
-  },
-  "extensions": {
-    "recommendations": [
-      "ms-vscode.vscode-typescript-next",
-      "bradlc.vscode-tailwindcss",
-      "esbenp.prettier-vscode",
-      "ms-python.python"
-    ]
-  }
-}
-EOF
-    
-    # Create a simple HTML page to display devcontainer info
-    echo "📄 Creating devcontainer info page..."
-    cat > ${local.workspace_dir}/devcontainer-info.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Devcontainer Configuration</title>
-    <style>
-        body { 
-            font-family: 'Monaco', 'Menlo', monospace; 
-            background: #1e1e1e; 
-            color: #d4d4d4; 
-            padding: 20px; 
-        }
-        pre { 
-            background: #2d2d30; 
-            padding: 20px; 
-            border-radius: 8px; 
-            overflow-x: auto;
-        }
-        h1 { color: #569cd6; }
-    </style>
-</head>
-<body>
-    <h1>🐳 Devcontainer Configuration</h1>
-    <p>Location: <code>.devcontainer/devcontainer.json</code></p>
-    <pre id="content">Loading...</pre>
-    
-    <script>
-        fetch('.devcontainer/devcontainer.json')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('content').textContent = JSON.stringify(data, null, 2);
-            })
-            .catch(error => {
-                document.getElementById('content').textContent = 'Error loading devcontainer.json: ' + error;
-            });
-    </script>
-</body>
-</html>
-EOF
-    
-    # Simulate dotfiles setup
-    if [ -n "${data.coder_parameter.dotfiles_repo.value}" ]; then
-      echo "📁 Would clone dotfiles from: ${data.coder_parameter.dotfiles_repo.value}"
-      echo "   (This is a dummy workspace - no actual cloning performed)"
-    fi
-    
-    echo "✅ Dummy workspace with VS Code ready!"
-    echo "🔧 VS Code connection options:"
-    echo "   1. Web VS Code: http://localhost:13337 (accessible via Coder dashboard)"
-    echo "   2. Desktop VS Code: Use the 'VS Code Desktop' app in Coder dashboard"
-    echo "   3. VS Code Insiders: Use the 'VS Code Insiders' app in Coder dashboard"
-    echo "   4. Devcontainer: Open workspace.code-workspace and click 'Reopen in Container'"
-    echo "ℹ️  This is a simulated environment for testing purposes"
-    
-    # Keep the agent running
+    # Keep the agent running with minimal overhead
     while true; do
-      sleep 30
-      if [ -f ~/.local/share/code-server/pid ]; then
-        PID=$(cat ~/.local/share/code-server/pid)
-        if ! kill -0 "$PID" 2>/dev/null; then
-          echo "⚠️  Code-server process died, restarting..."
-          # Restart the appropriate service
-          if [ "$CODE_SERVER_STARTED" = "simulated" ]; then
-            cd ${local.workspace_dir}
-            python3 -m http.server 13337 > /dev/null 2>&1 &
-            echo $! > ~/.local/share/code-server/pid
-          else
-            code-server \
-              --bind-addr 0.0.0.0:13337 \
-              --auth none \
-              --disable-telemetry \
-              --disable-update-check \
-              ${local.workspace_dir} > ~/.local/share/code-server/log 2>&1 &
-            echo $! > ~/.local/share/code-server/pid
-          fi
-        fi
-      fi
-      echo "💓 Dummy workspace heartbeat at $(date)"
-    done &
+      sleep 60
+      echo "💓 Devcontainer workspace heartbeat at $(date)"
+    done
   EOT
   
   # Shutdown script
   shutdown_script = <<-EOT
     #!/bin/bash
-    echo "🛑 Shutting down dummy workspace..."
+    echo "🛑 Shutting down devcontainer workspace..."
     
-    # Stop code-server if running
-    if [ -f ~/.local/share/code-server/pid ]; then
-      PID=$(cat ~/.local/share/code-server/pid)
+    # Stop file server if running
+    if [ -f /tmp/devcontainer-server.pid ]; then
+      PID=$(cat /tmp/devcontainer-server.pid)
       if kill -0 "$PID" 2>/dev/null; then
-        echo "Stopping code-server (PID: $PID)..."
+        echo "Stopping file server (PID: $PID)..."
         kill "$PID" || true
-        sleep 2
-        kill -9 "$PID" 2>/dev/null || true
       fi
-      rm -f ~/.local/share/code-server/pid
+      rm -f /tmp/devcontainer-server.pid
     fi
     
     # Cleanup any remaining processes
-    pkill -f "code-server" || true
     pkill -f "python3 -m http.server" || true
     
-    echo "✅ Dummy workspace stopped"
+    echo "✅ Devcontainer workspace stopped"
   EOT
   
-  # Connection options
+  # Minimal connection options - no VS Code apps
   display_apps {
-    vscode          = true
-    vscode_insiders = true
-    web_terminal    = true
-    ssh_helper      = true
-    port_forwarding_helper = true
+    web_terminal    = false
+    ssh_helper      = false
+    port_forwarding_helper = false
   }
 }
 
-# VS Code Desktop App
-resource "coder_app" "vscode_desktop" {
-  agent_id     = coder_agent.main.id
-  slug         = "vscode-desktop"
-  display_name = "VS Code Desktop"
-  icon         = "/icon/code.svg"
-  command      = "code --folder-uri vscode-remote://coder+${data.coder_workspace.me.name}${local.workspace_dir}"
-}
-
-# VS Code Web (code-server)
-resource "coder_app" "code_server" {
-  agent_id     = coder_agent.main.id
-  slug         = "code-server"
-  display_name = "VS Code Web"
-  url          = "http://localhost:13337?folder=${local.workspace_dir}"
-  icon         = "/icon/code.svg"
-  subdomain    = false
-  share        = "owner"
-  
-  healthcheck {
-    url       = "http://localhost:13337/healthz"
-    interval  = 10
-    threshold = 3
-  }
-}
-
-# VS Code Insiders Desktop App  
-resource "coder_app" "vscode_insiders" {
-  agent_id     = coder_agent.main.id
-  slug         = "vscode-insiders"
-  display_name = "VS Code Insiders"
-  icon         = "/icon/code.svg"
-  command      = "code-insiders --folder-uri vscode-remote://coder+${data.coder_workspace.me.name}${local.workspace_dir}"
-}
-
-# Web terminal (simplified for macOS)
-resource "coder_app" "terminal" {
-  agent_id     = coder_agent.main.id
-  slug         = "terminal"
-  display_name = "Terminal"
-  icon         = "/icon/terminal.svg"
-  url          = "http://localhost:7681"  # ttyd web terminal
-  subdomain    = false
-  share        = "owner"
-  
-  healthcheck {
-    url       = "http://localhost:7681"
-    interval  = 30
-    threshold = 3
-  }
-}
-
-# SSH connection info (display-only for macOS)
-resource "coder_app" "ssh" {
-  agent_id     = coder_agent.main.id
-  slug         = "ssh"
-  display_name = "SSH Info"
-  icon         = "/icon/terminal.svg"
-  url          = "http://localhost:13337/ssh-info"  # Custom endpoint showing SSH details
-  subdomain    = false
-  share        = "owner"
-}
-
-# Status page showing dummy info
-resource "coder_app" "status" {
-  agent_id     = coder_agent.main.id
-  slug         = "status"
-  display_name = "Workspace Status"
-  icon         = "/icon/info.svg"
-  url          = "http://localhost:8080"
-  subdomain    = false
-  share        = "owner"
-}
-
-# Devcontainer info app - displays devcontainer.json in a nice HTML page
+# Devcontainer info app - simple file browser
 resource "coder_app" "devcontainer_info" {
   agent_id     = coder_agent.main.id
   slug         = "devcontainer"
   display_name = "Devcontainer Info"
   icon         = "/icon/docker.svg"
-  url          = "http://localhost:13337/devcontainer-info.html"
+  url          = "http://localhost:8080/.devcontainer/devcontainer.json"
   subdomain    = false
   share        = "owner"
   
   healthcheck {
-    url       = "http://localhost:13337"
+    url       = "http://localhost:8080"
     interval  = 30
     threshold = 3
   }
-}
-
-# VS Code workspace file app
-resource "coder_app" "vscode_workspace" {
-  agent_id     = coder_agent.main.id
-  slug         = "workspace-file"
-  display_name = "Open VS Code Workspace"
-  icon         = "/icon/code.svg"
-  url          = "file://${local.workspace_dir}/workspace.code-workspace"
-  external     = true
 }
 
 # Metadata for the Coder UI
@@ -570,7 +338,7 @@ resource "coder_metadata" "workspace_info" {
   
   item {
     key   = "Type"
-    value = "Lightweight Workspace with Real Agent"
+    value = "Devcontainer Workspace"
   }
   
   item {
@@ -589,13 +357,13 @@ resource "coder_metadata" "workspace_info" {
   }
   
   item {
-    key   = "Agent Process"
-    value = "Running on host system"
+    key   = "File Server"
+    value = "http://localhost:8080"
   }
   
   item {
-    key   = "Agent Log"
-    value = "/tmp/coder-agent-${local.workspace_name}.log"
+    key   = "Devcontainer Config"
+    value = "${local.workspace_dir}/.devcontainer/devcontainer.json"
   }
   
   item {

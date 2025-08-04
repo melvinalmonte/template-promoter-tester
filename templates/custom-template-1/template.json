@@ -1,7 +1,7 @@
 {
-  "display_name": "VS Code Testing Template",
-  "description": "Lightweight workspace with real Coder agent and VS Code integration for testing.",
-  "icon": "/icon/code.svg",
-  "tags": ["testing", "vscode", "development", "lightweight"],
+  "display_name": "Devcontainer Template",
+  "description": "Simple workspace with built-in devcontainer configuration and file browser access.",
+  "icon": "/icon/docker.svg",
+  "tags": ["devcontainer", "development", "lightweight"],
   "category": "development"
 } 
