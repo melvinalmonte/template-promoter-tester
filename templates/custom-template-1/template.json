@@ -1,7 +1,7 @@
 {
-  "display_name": "Minimal Devcontainer",
-  "description": "Bare minimum template with devcontainer configuration - just create and use in VS Code.",
+  "display_name": "Kubernetes Envbuilder Devcontainer",
+  "description": "Full devcontainer environment on Kubernetes with envbuilder - includes Go and VS Code Server.",
   "icon": "/icon/docker.svg",
-  "tags": ["devcontainer", "minimal", "vscode"],
+  "tags": ["devcontainer", "envbuilder", "kubernetes", "vscode", "node", "python"],
   "category": "development"
 } 

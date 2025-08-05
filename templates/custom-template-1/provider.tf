@@ -2,19 +2,13 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "~> 0.12.0"
+      version = "~> 2.0"
     }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.2"
+    kubernetes = {
+      source = "hashicorp/kubernetes"
     }
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.4"
+    envbuilder = {
+      source = "coder/envbuilder"
     }
   }
 }
-
-provider "coder" {}
-provider "null" {}
-provider "local" {} 

@@ -55,14 +55,15 @@ resource "coderd_template" "templates" {
 
   versions = [
     {
-      name        = "${each.key}-${var.commit_sha}"
-      description = var.commit_sha != "" ? "Deployed from commit: ${var.commit_sha}" : "Active version"
+      name        = var.commit_sha != "" ? "${each.key}-${var.commit_sha}" : "${each.key}-${substr(md5(timestamp()), 0, 8)}"
+      description = var.commit_sha != "" ? "Deployed from commit: ${var.commit_sha}" : "Active version - ${timestamp()}"
       directory   = "../templates/${each.key}"
       active      = true
       tf_vars     = local.all_tf_vars
     }
   ]
 }
+
 
 # ---------------------------------------------------------------------------
 # outputs (for debugging)
