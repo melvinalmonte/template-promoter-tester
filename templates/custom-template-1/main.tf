@@ -104,6 +104,7 @@ data "coder_parameter" "fallback_image" {
   order        = 6
 }
 
+
 data "coder_parameter" "devcontainer_builder" {
   description  = <<-EOF
 Image that will build the devcontainer.
@@ -143,9 +144,8 @@ locals {
     "CODER_AGENT_TOKEN" : coder_agent.main.token,
     # Use the docker gateway if the access URL is 127.0.0.1
     "CODER_AGENT_URL" : replace(data.coder_workspace.me.access_url, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
-    # ENVBUILDER_GIT_URL and ENVBUILDER_CACHE_REPO will be overridden by the provider
-    # if the cache repo is enabled.
-    "ENVBUILDER_GIT_URL" : var.cache_repo == "" ? local.repo_url : "",
+    # Use devcontainer repo for building, not user repo
+    "ENVBUILDER_GIT_URL" : var.cache_repo == "" ? "https://github.com/melvinalmonte/devcontainer-test.git" : "",
     # Use the docker gateway if the access URL is 127.0.0.1
     "ENVBUILDER_INIT_SCRIPT" : replace(coder_agent.main.init_script, "/localhost|127\\.0\\.0\\.1/", "host.docker.internal"),
     "ENVBUILDER_FALLBACK_IMAGE" : data.coder_parameter.fallback_image.value,
@@ -311,13 +311,32 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
+
+
 resource "coder_agent" "main" {
   arch           = data.coder_provisioner.me.arch
   os             = "linux"
   startup_script = <<-EOT
     set -e
+    
+    # Extract repo name from URL
+    REPO_NAME=$(basename ${local.repo_url} .git)
+    REPO_PATH="/workspaces/$REPO_NAME"
+    rm -rf /workspaces/devcontainer-test
+    
+    if [ ! -d "$REPO_PATH" ]; then
+      echo "📦 Cloning user repository: ${local.repo_url}"
+      git clone ${local.repo_url}
+      echo "✅ Repository cloned successfully to $REPO_PATH"
+    else
+      echo "📂 Repository already exists at $REPO_PATH"
+      echo "💡 Checking for updates..."
+      cd "$REPO_PATH"
+      git fetch
+      echo "✨ Repository is ready to use"
+    fi
 
-    # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
+    # Add any other commands that should be executed at workspace startup here
   EOT
   dir            = "/workspaces"
 
