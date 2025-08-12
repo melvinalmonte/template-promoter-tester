@@ -41,70 +41,199 @@ variable "insecure_cache_repo" {
   type        = bool
 }
 
-data "coder_parameter" "cpu" {
-  type         = "number"
-  name         = "cpu"
-  display_name = "CPU"
-  description  = "CPU limit (cores)."
-  default      = "1"
-  icon         = "/emojis/1f5a5.png"
-  mutable      = false
-  validation {
-    min = 1
-    max = 99999
+# Platform Parameter (Radio) - Basic Workspace Configuration
+data "coder_parameter" "platform" {
+  name         = "platform"
+  display_name = "Platform"
+  description  = "Select the platform for your workspace"
+  type         = "string"
+  form_type    = "radio"
+  order        = 1
+  default      = "On-Premise"
+
+  option {
+    name        = "On-Premise"
+    value       = "On-Premise"
+    description = "On-Premise Platform"
   }
-  order = 1
+
+  option {
+    name        = "Cloud"
+    value       = "Cloud"
+    description = "Cloud Platform"
+  }
+
+  option {
+    name        = "AI Optimized"
+    value       = "AI Optimized"
+    description = "AI Optimized Platform"
+  }
 }
 
-data "coder_parameter" "memory" {
-  type         = "number"
-  name         = "memory"
-  display_name = "Memory"
-  description  = "Memory limit (GiB)."
-  default      = "1"
-  icon         = "/icon/memory.svg"
+# Language Parameter (Dropdown) - Basic Workspace Configuration
+data "coder_parameter" "language" {
+  name         = "language"
+  display_name = "Language"
+  description  = "Select the programming language for your workspace"
+  type         = "string"
+  form_type    = "dropdown"
+  order        = 2
+  default      = "Python"
   mutable      = false
-  validation {
-    min = 1
-    max = 99999
+
+  option {
+    name        = "Python"
+    value       = "Python"
+    description = "Python programming language"
+    icon        = "/icon/python.svg"
   }
-  order = 2
+
+  option {
+    name        = "Java"
+    value       = "Java"
+    description = "Java programming language"
+    icon        = "/icon/java.svg"
+  }
+
+  option {
+    name        = "Golang"
+    value       = "Golang"
+    description = "Go programming language"
+    icon        = "/icon/go.svg"
+  }
+
+  option {
+    name        = "Dotnet"
+    value       = "Dotnet"
+    description = ".NET framework"
+    icon        = "/icon/dotnet.svg"
+  }
 }
 
-data "coder_parameter" "workspaces_volume_size" {
-  name         = "workspaces_volume_size"
-  display_name = "Workspaces volume size"
-  description  = "Size of the `/workspaces` volume (GiB)."
-  default      = "1"
-  type         = "number"
-  icon         = "/emojis/1f4be.png"
-  mutable      = false
-  validation {
-    min = 1
-    max = 99999
-  }
-  order = 3
-}
-
+# Repository Parameter - Basic Workspace Configuration (moved up)
 data "coder_parameter" "repo" {
   description  = "Select a repository to automatically clone and start working with a devcontainer."
   display_name = "Repository (auto)"
   mutable      = true
   name         = "repo"
-  order        = 4
+  order        = 3
   type         = "string"
+  icon         = "/icon/git.svg"
 }
 
+# Jupyter Notebook Parameter (Radio) - Only show if Python is selected
+data "coder_parameter" "jupyter_notebook" {
+  count        = data.coder_parameter.language.value == "Python" ? 1 : 0
+  name         = "jupyter_notebook"
+  display_name = "Jupyter Notebook"
+  description  = "Enable Jupyter Notebook in your workspace"
+  type         = "bool"
+  form_type    = "radio"
+  order        = 4
+  default      = false
+  icon         = "/icon/jupyter.svg"
+
+  option {
+    name        = "Yes"
+    value       = true
+    description = "Enable Jupyter Notebook"
+  }
+
+  option {
+    name        = "No"
+    value       = false
+    description = "Disable Jupyter Notebook"
+  }
+}
+
+# CPU Parameter (Slider) - Resource Allocation Section
+data "coder_parameter" "cpu" {
+  name         = "cpu"
+  display_name = "CPU"
+  description  = "Select CPU cores"
+  type         = "number"
+  form_type    = "slider"
+  order        = 5
+  default      = 4
+  icon         = "/icon/memory.svg"
+  mutable      = false
+
+  validation {
+    min   = 1
+    max   = 32
+    error = "CPU value {value} is not between {min} and {max} cores"
+  }
+}
+
+# Memory Parameter (Slider) - Resource Allocation Section
+data "coder_parameter" "memory" {
+  name         = "memory"
+  display_name = "Memory"
+  description  = "Select memory allocation in GB"
+  type         = "number"
+  form_type    = "slider"
+  order        = 6
+  default      = 8
+  icon         = "/icon/memory.svg"
+  mutable      = false
+
+  validation {
+    min   = 1
+    max   = 32
+    error = "Memory value {value} is not between {min} and {max} GB"
+  }
+}
+
+# Workspace Volume Size Parameter - Resource Allocation Section
+data "coder_parameter" "workspaces_volume_size" {
+  name         = "workspaces_volume_size"
+  display_name = "Workspaces volume size"
+  description  = "Size of the `/workspaces` volume (GiB)."
+  default      = "5"
+  type         = "number"
+  form_type    = "slider"
+  icon         = "/icon/memory.svg"
+  mutable      = false
+  order        = 7
+  
+  validation {
+    min = 1
+    max = 100
+    error = "Volume size {value} is not between {min} and {max} GiB"
+  }
+}
+
+# GPU Parameter (Slider) - Only show if AI Factory is selected
+data "coder_parameter" "gpu" {
+  count        = data.coder_parameter.platform.value == "AI Optimized" ? 1 : 0
+  name         = "gpu"
+  display_name = "GPU"
+  description  = "Select number of GPUs"
+  type         = "number"
+  form_type    = "slider"
+  order        = 8
+  default      = 0
+  icon         = "/icon/memory.svg"
+
+  validation {
+    min   = 0
+    max   = 4
+    error = "GPU value {value} is not between {min} and {max} GPUs"
+  }
+}
+
+# Fallback Image Parameter - Advanced Configuration Section
 data "coder_parameter" "fallback_image" {
   default      = "codercom/enterprise-base:ubuntu"
   description  = "This image runs if the devcontainer fails to build."
   display_name = "Fallback Image"
   mutable      = true
   name         = "fallback_image"
-  order        = 6
+  order        = 9
+  icon         = "/icon/docker.svg"
 }
 
-
+# Devcontainer Builder Parameter - Advanced Configuration Section
 data "coder_parameter" "devcontainer_builder" {
   description  = <<-EOF
 Image that will build the devcontainer.
@@ -115,7 +244,8 @@ EOF
   mutable      = true
   name         = "devcontainer_builder"
   default      = "ghcr.io/coder/envbuilder:latest"
-  order        = 7
+  order        = 10
+  icon         = "/icon/docker.svg"
 }
 
 variable "cache_repo_secret_name" {
@@ -311,8 +441,6 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
-
-
 resource "coder_agent" "main" {
   arch           = data.coder_provisioner.me.arch
   os             = "linux"
@@ -336,6 +464,25 @@ resource "coder_agent" "main" {
       echo "✨ Repository is ready to use"
     fi
 
+    # Platform-specific setup
+    echo "🚀 Setting up ${data.coder_parameter.platform.value} platform with ${data.coder_parameter.language.value}"
+    
+    # Jupyter Notebook setup (only for Python)
+    %{if length(data.coder_parameter.jupyter_notebook) > 0}
+    if [ "${data.coder_parameter.jupyter_notebook[0].value}" = "true" ]; then
+      echo "📓 Setting up Jupyter Notebook for Python environment"
+      # Add Jupyter setup commands here
+    fi
+    %{endif}
+    
+    # GPU setup (only for AI Factory)
+    %{if length(data.coder_parameter.gpu) > 0}
+    if [ "${data.coder_parameter.gpu[0].value}" -gt "0" ]; then
+      echo "🎮 Configuring ${data.coder_parameter.gpu[0].value} GPU(s) for AI Factory platform"
+      # Add GPU setup commands here
+    fi
+    %{endif}
+
     # Add any other commands that should be executed at workspace startup here
   EOT
   dir            = "/workspaces"
@@ -349,6 +496,9 @@ resource "coder_agent" "main" {
     GIT_AUTHOR_EMAIL    = local.git_author_email
     GIT_COMMITTER_NAME  = local.git_author_name
     GIT_COMMITTER_EMAIL = local.git_author_email
+    # Platform and language environment variables
+    WORKSPACE_PLATFORM = data.coder_parameter.platform.value
+    WORKSPACE_LANGUAGE = data.coder_parameter.language.value
   }
 
   # The following metadata blocks are optional. They are used to display
@@ -430,10 +580,17 @@ module "code-server" {
   order    = 1
 }
 
-
 resource "coder_metadata" "container_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = coder_agent.main.id
+  item {
+    key   = "platform"
+    value = data.coder_parameter.platform.value
+  }
+  item {
+    key   = "language"
+    value = data.coder_parameter.language.value
+  }
   item {
     key   = "workspace image"
     value = var.cache_repo == "" ? local.devcontainer_builder_image : envbuilder_cached_image.cached.0.image
@@ -445,5 +602,33 @@ resource "coder_metadata" "container_info" {
   item {
     key   = "cache repo"
     value = var.cache_repo == "" ? "not enabled" : var.cache_repo
+  }
+  item {
+    key   = "cpu cores"
+    value = "${data.coder_parameter.cpu.value}"
+  }
+  item {
+    key   = "memory (GB)"
+    value = "${data.coder_parameter.memory.value}"
+  }
+  item {
+    key   = "storage (GB)"
+    value = "${data.coder_parameter.workspaces_volume_size.value}"
+  }
+  # Conditional metadata for Jupyter Notebook
+  dynamic "item" {
+    for_each = length(data.coder_parameter.jupyter_notebook) > 0 ? [1] : []
+    content {
+      key   = "jupyter notebook"
+      value = data.coder_parameter.jupyter_notebook[0].value ? "enabled" : "disabled"
+    }
+  }
+  # Conditional metadata for GPU
+  dynamic "item" {
+    for_each = length(data.coder_parameter.gpu) > 0 ? [1] : []
+    content {
+      key   = "gpu count"
+      value = "${data.coder_parameter.gpu[0].value}"
+    }
   }
 }
