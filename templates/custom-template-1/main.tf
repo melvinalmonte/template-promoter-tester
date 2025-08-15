@@ -195,10 +195,10 @@ data "coder_parameter" "workspaces_volume_size" {
   icon         = "/icon/memory.svg"
   mutable      = false
   order        = 7
-  
+
   validation {
-    min = 1
-    max = 100
+    min   = 1
+    max   = 100
     error = "Volume size {value} is not between {min} and {max} GiB"
   }
 }
@@ -568,6 +568,97 @@ resource "coder_agent" "main" {
   }
 }
 
+# Install VS Code extensions after workspace is ready
+resource "coder_script" "install_vscode_extensions" {
+  agent_id     = coder_agent.main.id
+  display_name = "Install VS Code Extensions"
+  icon         = "/icon/code.svg"
+  script = <<-EOT
+    #!/bin/bash
+    set -e
+    
+    echo "🔧 Installing VS Code extensions for ${data.coder_parameter.language.value}..."
+    
+    # Wait for code-server to be available
+    echo "⏳ Waiting for code-server to be ready..."
+    timeout 120 bash -c 'until pgrep -f "code-server" > /dev/null; do sleep 3; done' || {
+      echo "⚠️  code-server not found, skipping extension installation"
+      exit 1
+    }
+    
+    # Additional wait to ensure code-server is fully ready
+    sleep 10
+    
+    # Create temporary directory for extensions
+    mkdir -p /tmp/vscode-extensions
+    cd /tmp/vscode-extensions
+    
+    echo "🐍 Installing Python development extensions..."
+        
+    # Core Python extension
+    curl -L -o python.vsix "https://open-vsx.org/api/ms-python/python/2025.4.0/file/ms-python.python-2025.4.0.vsix"
+    code-server --install-extension python.vsix --force
+    
+    # Python linting
+    curl -L -o pylint.vsix "https://open-vsx.org/api/ms-python/pylint/2024.2.0/file/ms-python.pylint-2024.2.0.vsix"
+    code-server --install-extension pylint.vsix --force
+    
+    # Black formatter
+    curl -L -o black.vsix "https://open-vsx.org/api/ms-python/black-formatter/2024.6.0/file/ms-python.black-formatter-2024.6.0.vsix"
+    code-server --install-extension black.vsix --force
+    
+    # Jupyter support
+    curl -L -o jupyter.vsix "https://open-vsx.org/api/ms-toolsai/jupyter/2025.7.0/file/ms-toolsai.jupyter-2025.7.0.vsix"
+    code-server --install-extension jupyter.vsix --force
+    
+    echo "✅ Python extensions installed"
+
+    # Language Support for Java
+    curl -L -o java.vsix "https://open-vsx.org/api/redhat/java/1.45.2025081408/file/redhat.java-1.45.2025081408.vsix"
+    code-server --install-extension java.vsix --force
+    
+    # Java Debugger
+    curl -L -o java-debug.vsix "https://open-vsx.org/api/vscjava/vscode-java-debug/0.58.2/file/vscjava.vscode-java-debug-0.58.2.vsix"
+    code-server --install-extension java-debug.vsix --force
+    
+    # Java Test Runner
+    curl -L -o java-test.vsix "https://open-vsx.org/api/vscjava/vscode-java-test/0.43.1/file/vscjava.vscode-java-test-0.43.1.vsix"
+    code-server --install-extension java-test.vsix --force
+    
+    # Maven support
+    curl -L -o maven.vsix "https://open-vsx.org/api/vscjava/vscode-maven/0.44.0/file/vscjava.vscode-maven-0.44.0.vsix"
+    code-server --install-extension maven.vsix --force
+
+    echo "✅ Java extensions installed"
+
+    echo "🐹 Installing Go development extensions..."
+        
+    # Official Go extension
+    curl -L -o go.vsix "https://open-vsx.org/api/golang/Go/0.48.0/file/golang.Go-0.48.0.vsix"
+    code-server --install-extension go.vsix --force
+    
+
+    echo "✅ Go extensions installed"
+
+
+    # Terraform extension
+    curl -L -o terraform.vsix "https://open-vsx.org/api/hashicorp/terraform/web/2.34.5/file/hashicorp.terraform-2.34.5@web.vsix"
+    code-server --install-extension terraform.vsix --force
+
+    # gitlab extension
+    curl -L -o gitlab.vsix "https://open-vsx.org/api/GitLab/gitlab-workflow/6.36.0/file/GitLab.gitlab-workflow-6.36.0.vsix"
+    code-server --install-extension gitlab.vsix --force
+
+    # Clean up
+    rm -rf /tmp/vscode-extensions
+    
+    echo "🎉 VS Code extension installation completed for ${data.coder_parameter.language.value}"
+  EOT
+  
+  run_on_start = true
+  run_on_stop  = false
+}
+
 # See https://registry.coder.com/modules/coder/code-server
 module "code-server" {
   count  = data.coder_workspace.me.start_count
@@ -605,15 +696,15 @@ resource "coder_metadata" "container_info" {
   }
   item {
     key   = "cpu cores"
-    value = "${data.coder_parameter.cpu.value}"
+    value = data.coder_parameter.cpu.value
   }
   item {
     key   = "memory (GB)"
-    value = "${data.coder_parameter.memory.value}"
+    value = data.coder_parameter.memory.value
   }
   item {
     key   = "storage (GB)"
-    value = "${data.coder_parameter.workspaces_volume_size.value}"
+    value = data.coder_parameter.workspaces_volume_size.value
   }
   # Conditional metadata for Jupyter Notebook
   dynamic "item" {
@@ -628,7 +719,7 @@ resource "coder_metadata" "container_info" {
     for_each = length(data.coder_parameter.gpu) > 0 ? [1] : []
     content {
       key   = "gpu count"
-      value = "${data.coder_parameter.gpu[0].value}"
+      value = data.coder_parameter.gpu[0].value
     }
   }
 }
